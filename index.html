@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Horror Boss Fight </title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Creepster&family=Poppins:wght=400;700;900&display=swap');
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        body {
+            background-color: #050000;
+            color: white;
+            font-family: 'Poppins', sans-serif;
+            height: 100vh;
+            width: 100vw;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        /* Arena Pertandingan - RASIO VERTIKAL 9:16 FULL HP */
+        #game-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            max-width: 450px; /* Batasan biar pas juga ditest di laptop */
+            background: linear-gradient(180deg, #1a0505 0%, #0a0101 100%);
+            box-shadow: 0 0 50px rgba(255, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        /* Screen Start & Game Over */
+        .screen {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: #0a0101;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            transition: opacity 0.5s ease;
+            padding: 20px;
+        }
+
+        .boss-title {
+            font-family: 'Creepster', cursive;
+            font-size: 3.5rem;
+            color: #ff1f1f;
+            text-shadow: 0 0 20px rgba(255, 31, 31, 0.6);
+            margin-bottom: 30px;
+            letter-spacing: 3px;
+            text-align: center;
+            line-height: 1.2;
+        }
+
+        .btn-start {
+            background: #ff1f1f;
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 1.2rem;
+            font-weight: 700;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 0 25px rgba(255, 31, 31, 0.5);
+            transition: 0.3s;
+            text-transform: uppercase;
+        }
+
+        /* LAYAR INTRO SINEMATIK NYATU DI ARENA */
+        #intro-screen {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: rgba(10, 1, 1, 0.95);
+            z-index: 8;
+            display: none;
+            flex-direction: column;
+            justify-content: flex-end;
+            align-items: center;
+            padding-bottom: 140px;
+            pointer-events: none;
+        }
+
+        .intro-text-box {
+            width: 90%;
+            min-height: 60px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 10px;
+            text-align: center;
+        }
+
+        .intro-narrative {
+            font-family: 'Poppins', sans-serif;
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #ffffff;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.4);
+            text-align: center;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            display: inline-block;
+            word-spacing: 2px;
+            line-height: 1.4;
+            border-right: 3px solid #ff1f1f;
+            padding-right: 5px;
+            animation: blinkCursor 0.6s step-end infinite;
+        }
+
+        @keyframes blinkCursor {
+            from, to { border-color: transparent }
+            50% { border-color: #ff1f1f; }
+        }
+
+        /* HUD Status Darah Player */
+        .hud {
+            position: absolute;
+            top: 25px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 5;
+            opacity: 0; /* Sembunyi saat intro */
+            transition: opacity 0.5s ease;
+        }
+
+        .health-group {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .health-bar-container {
+            width: 70%;
+            background: #222;
+            border: 1px solid rgba(255,255,255,0.2);
+            height: 18px;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .health-bar {
+            width: 100%;
+            height: 100%;
+            background: #00ff66;
+            transition: width 0.2s ease;
+        }
+
+        #boss-hp-bar {
+            background: #ff1f1f;
+            box-shadow: 0 0 10px #ff1f1f;
+        }
+
+        /* INDIKATOR PERINGATAN (WARNING ATTACK) */
+        #warning-overlay {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border: 0px solid transparent;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 4;
+            pointer-events: none;
+            transition: all 0.2s ease;
+        }
+
+        #warning-overlay.active {
+            animation: redFlash 0.25s infinite alternate;
+        }
+
+        .warning-text {
+            font-family: 'Creepster', cursive;
+            font-size: 2.5rem;
+            color: #ff1f1f;
+            opacity: 0;
+            transform: scale(0.8);
+            transition: all 0.2s ease;
+            text-align: center;
+            padding: 0 20px;
+            text-shadow: 0 0 10px #000;
+        }
+
+        #warning-overlay.active .warning-text {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        @keyframes redFlash {
+            0% { box-shadow: inset 0 0 0px rgba(255,0,0,0); background: rgba(255,0,0,0); }
+            100% { box-shadow: inset 0 0 80px rgba(255, 0, 0, 0.8); background: rgba(255,0,0,0.2); }
+        }
+
+        /* FOTO BOS YANG BISA DIGANTI */
+        #boss-container {
+            position: absolute;
+            top: 130px;
+            left: 50%;
+            transform: translateX(-50%) scale(0); /* Start hidden */
+            width: 130px;
+            height: 130px;
+            border-radius: 50%;
+            border: 4px solid #ff1f1f;
+            box-shadow: 0 0 30px rgba(255, 31, 31, 0.5);
+            overflow: hidden;
+            background: #111;
+            z-index: 9; 
+            transition: transform 7s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.5s ease;
+        }
+
+        #boss-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* Animasi Mengambang setelah Intro Selesai */
+        .boss-floating-active {
+            animation: bossFloat 3s infinite ease-in-out !important;
+        }
+
+        @keyframes bossFloat {
+            0%, 100% { transform: translate(-50%, 0px) scale(1); }
+            50% { transform: translate(-50%, -15px) scale(1); }
+        }
+
+        /* Animasi Aura Mengumpulkan Kekuatan */
+        @keyframes bossAwakeningPulse {
+            0% { box-shadow: 0 0 30px rgba(255, 31, 31, 0.5); border-color: #ff1f1f; }
+            100% { box-shadow: 0 0 60px #ff0000, 0 0 100px #ff5500; border-color: #ffffff; }
+        }
+
+        /* Efek Getar Kamera Sinematik */
+        .shake-effect {
+            animation: screenShake 0.15s infinite alternate;
+        }
+
+        @keyframes screenShake {
+            0% { transform: translate(2px, 1px) rotate(0deg); }
+            100% { transform: translate(-1px, -2px) rotate(0.5deg); }
+        }
+
+        /* PLAYER CUSTOM UTK TEMA HOROR GAME */
+        #player {
+            position: absolute;
+            bottom: 120px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 50px;
+            height: 50px;
+            background: #111;
+            border: 3px solid #3498db;
+            border-radius: 50%;
+            box-shadow: 0 0 20px rgba(52, 152, 219, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.6rem;
+            z-index: 5;
+            opacity: 0; /* Sembunyi saat intro */
+            transition: left 0.05s linear, opacity 0.5s ease;
+        }
+
+        #player::after {
+            content: ''; 
+            position: absolute;
+            text-shadow: 0 0 8px #3498db;
+        }
+
+        /* Serangan Bos (Proyektil) */
+        .boss-attack {
+            position: absolute;
+            width: 25px;
+            height: 25px;
+            background: #ff3300;
+            border-radius: 50%;
+            box-shadow: 0 0 18px #ff0000;
+            top: -50px;
+        }
+
+        /* CSS BARU UNTUK SERANGAN LASER & SHOCKWAVE */
+        .laser-line {
+            position: absolute;
+            top: 0;
+            width: 4px;
+            height: 100%;
+            background: rgba(255, 0, 0, 0.3);
+            box-shadow: 0 0 10px rgba(255, 0, 0, 0.5);
+            z-index: 3;
+            transition: all 0.1s ease;
+        }
+        .laser-line.fire {
+            width: 42px;
+            background: #ffffff;
+            box-shadow: 0 0 30px #ff0000, 0 0 50px #ff0000, inset 0 0 15px #ff3300;
+        }
+        .boss-shockball {
+            position: absolute;
+            width: 45px;
+            height: 45px;
+            background: #ffaa00;
+            border-radius: 50%;
+            box-shadow: 0 0 30px #ff5500;
+            top: -60px;
+        }
+        .shockwave {
+            position: absolute;
+            width: 20px;
+            height: 45px;
+            background: linear-gradient(to top, #ff3300, transparent);
+            border-top: 3px solid #ffffff;
+            box-shadow: 0 -5px 20px #ff0000;
+            z-index: 4;
+        }
+
+        /* TOMBOL KONTROL DI BAWAH LAYAR HP */
+        .controls {
+            position: absolute;
+            bottom: 30px;
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            padding: 0 30px;
+            z-index: 6;
+            opacity: 0; /* Sembunyi saat intro */
+            transition: opacity 0.5s ease;
+        }
+
+        .btn-ctrl {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            width: 45%;
+            padding: 18px 0;
+            font-size: 1.1rem;
+            font-weight: bold;
+            border-radius: 12px;
+            cursor: pointer;
+            backdrop-filter: blur(5px);
+            transition: 0.1s;
+        }
+        .btn-ctrl:active { 
+            background: rgba(255, 31, 31, 0.3); 
+            border-color: #ff1f1f;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <div class="screen" id="start-screen">
+            <h1 class="boss-title">THE HARBINGER</h1>
+            <button class="btn-start" onclick="startIntro()">Start Game</button>
+        </div>
+
+        <div class="screen" id="gameover-screen" style="display:none;">
+            <h1 class="boss-title" style="font-size: 2.5rem;">KAMU MATI</h1>
+            <button class="btn-start" onclick="location.reload()">COBA LAGI </button>
+        </div>
+
+        <div id="intro-screen">
+            <div class="intro-text-box">
+                <p id="intro-text" class="intro-narrative"></p>
+            </div>
+        </div>
+
+        <div class="hud" id="game-hud">
+            <div class="health-group">
+                <span style="font-size:0.75rem; font-weight:bold;">PLAYER HP</span>
+                <div class="health-bar-container">
+                    <div id="player-hp-bar" class="health-bar"></div>
+                </div>
+            </div>
+            <div class="health-group">
+                <span style="font-size:0.75rem; font-weight:bold; color:#ff1f1f;">BOSS HP</span>
+                <div class="health-bar-container">
+                    <div id="boss-hp-bar" class="health-bar"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="warning-overlay">
+            <h2 class="warning-text" id="warning-label">AWAS! BOS MENYERANG!</h2>
+        </div>
+
+        <div id="boss-container">
+            <img src="bos.jpg" alt="💀">
+        </div>
+        
+        <div id="player"></div>
+
+        <div class="controls" id="game-controls">
+            <button class="btn-ctrl" onclick="movePlayer('left')">◀ KIRI</button>
+            <button class="btn-ctrl" onclick="movePlayer('right')">KANAN ▶</button>
+        </div>
+    </div>
+
+    <audio id="bgm" src="soundtrack.mp3" loop></audio>
+    <audio id="sfx-warning" src="warning.mp3"></audio>
+    <audio id="sfx-attack" src="https://assets.mixkit.co/active_storage/sfx/2753/2753-84.wav"></audio>
+    <audio id="sfx-hit" src="https://assets.mixkit.co/active_storage/sfx/2592/2592-84.wav"></audio>
+
+    <script>
+        const player = document.getElementById('player');
+        const warningOverlay = document.getElementById('warning-overlay');
+        const warningLabel = document.getElementById('warning-label'); // Ditambahkan variabel labelnya
+        const container = document.getElementById('game-container');
+        const bossContainer = document.getElementById('boss-container');
+        const introScreen = document.getElementById('intro-screen');
+        const introTextEl = document.getElementById('intro-text');
+        
+        const bgm = document.getElementById('bgm');
+        const sfxWarning = document.getElementById('sfx-warning');
+        const sfxAttack = document.getElementById('sfx-attack');
+        const sfxHit = document.getElementById('sfx-hit');
+
+        let playerHp = 100;
+        let bossHp = 100;
+        let playerX; 
+        let gameActive = false;
+        let loopSerangan;
+        let urutanSerangan = 0; // Mengatur jalannya variasi giliran serangan bos
+
+        setTimeout(() => {
+            playerX = (container.offsetWidth / 2) - 25; 
+            player.style.left = playerX + 'px';
+        }, 100);
+
+        window.addEventListener('keydown', (e) => {
+            if (!gameActive) return;
+            if (e.key === 'ArrowLeft' || e.key === 'a') movePlayer('left');
+            if (e.key === 'ArrowRight' || e.key === 'd') movePlayer('right');
+        });
+
+        function movePlayer(direction) {
+            const step = 40; 
+            const maxRight = container.offsetWidth - 70;
+            if (direction === 'left' && playerX > 20) {
+                playerX -= step;
+            } else if (direction === 'right' && playerX < maxRight) {
+                playerX += step;
+            }
+            player.style.left = playerX + 'px';
+        }
+
+        function ketikTeks(teks, callback) {
+            introTextEl.innerText = "";
+            let i = 0;
+            clearInterval(window.intervalKetik);
+            
+            window.intervalKetik = setInterval(() => {
+                i++;
+                introTextEl.innerText = teks.substring(0, i); 
+                
+                if (i >= teks.length) {
+                    clearInterval(window.intervalKetik);
+                    if(callback) setTimeout(callback, 2200); 
+                }
+            }, 50);
+        }
+
+        // UTAMA: LOGIKA INTRO SINEMATIK 22 DETIK
+        function startIntro() {
+            document.getElementById('start-screen').style.opacity = '0';
+            setTimeout(() => { document.getElementById('start-screen').style.display = 'none'; }, 500);
+
+            introScreen.style.display = 'flex';
+
+            // FIX AUDIO PERMISSON: Pancing aktivasi suara di awal interaksi klik tombol
+            bgm.volume = 0.5;
+            bgm.play().catch(e => console.log("Soundtrack belum siap."));
+            
+            // Play kosong sekilas biar browser membuka gerbang audio sfks-nya
+            sfxWarning.play().then(() => { sfxWarning.pause(); sfxWarning.currentTime = 0; }).catch(() => {});
+            sfxAttack.play().then(() => { sfxAttack.pause(); sfxAttack.currentTime = 0; }).catch(() => {});
+            sfxHit.play().then(() => { sfxHit.pause(); sfxHit.currentTime = 0; }).catch(() => {});
+
+            // [Detik 0 - 7] FASE 1: Kebangkitan
+            setTimeout(() => {
+                container.classList.add('shake-effect'); 
+                bossContainer.style.transform = 'translateX(-50%) scale(1)'; 
+                ketikTeks("Darkness began to envelop...", () => {
+                    ketikTeks("something terrible is approaching...");
+                });
+            }, 100);
+
+            // [Detik 7 - 15] FASE 2: Awakening Pulse Aura
+            setTimeout(() => {
+                container.classList.remove('shake-effect');
+                bossContainer.style.animation = 'bossAwakeningPulse 0.4s infinite alternate'; 
+                ketikTeks("he found your position...", () => {
+                    ketikTeks("demonic power locks your soul!");
+                });
+            }, 7000);
+
+            // [Detik 15 - 22] FASE 3: Ancaman Terakhir
+            setTimeout(() => {
+                container.classList.add('shake-effect'); 
+                ketikTeks("NO WAY OUT.", () => {
+                    let textBlink = setInterval(() => {
+                        introTextEl.innerText = "YOU WILL DIED!!!";
+                    }, 100);
+                    setTimeout(() => {
+                        clearInterval(textBlink);
+                        introTextEl.innerText = "FIGHT!";
+                    }, 2100);
+                });
+            }, 15000);
+
+            // [Detik 22 TEPAT!] FASE 4: Mulai Hard Mode
+            setTimeout(() => {
+                container.classList.remove('shake-effect');
+                bossContainer.style.animation = 'none';
+                bossContainer.offsetHeight; 
+                bossContainer.classList.add('boss-floating-active'); 
+                
+                introScreen.style.opacity = '0';
+                setTimeout(() => { introScreen.style.display = 'none'; }, 500);
+
+                document.getElementById('game-hud').style.opacity = '1';
+                document.getElementById('game-controls').style.opacity = '1';
+                player.style.opacity = '1';
+
+                startGameplay();
+            }, 22000); 
+        }
+
+        function startGameplay() {
+            gameActive = true;
+            // Interval disesuaikan jadi 2.2 detik biar ngasih waktu serangan mekanik baru kelar beraksi
+            loopSerangan = setInterval(() => {
+                if (gameActive) polaSeranganBos();
+            }, 2200);
+        }
+
+        // ROTASI POLA SERANGAN BARU (BOLA -> LASER -> SHOCKWAVE)
+        function polaSeranganBos() {
+            if (urutanSerangan === 0) {
+                // SKILL 1: Serangan Bola Jatuh (Bawaan Asli)
+                warningLabel.innerText = "WARNING!!!";
+                warningOverlay.classList.add('active');
+                
+                try {
+                    sfxWarning.currentTime = 0;
+                    sfxWarning.play().catch(() => {});
+                } catch(e) {}
+
+                const targetX = Math.floor(Math.random() * (container.offsetWidth - 50)) + 15;
+
+                setTimeout(() => {
+                    warningOverlay.classList.remove('active');
+                    if (!gameActive) return;
+
+                    try {
+                        sfxAttack.currentTime = 0;
+                        sfxAttack.play().catch(() => {});
+                    } catch(e) {}
+                    
+                    buatProyektil(targetX);
+                }, 750); 
+
+                urutanSerangan = 1; // Tukar ke skill laser berikutnya
+
+            } else if (urutanSerangan === 1) {
+                // SKILL 2: Serangan LASER (Permintaan Revisi)
+                warningLabel.innerText = "LASER WARNING!";
+                warningOverlay.classList.add('active');
+
+                try { sfxWarning.currentTime = 0; sfxWarning.play().catch(() => {}); } catch(e) {}
+
+                const targetX = Math.floor(Math.random() * (container.offsetWidth - 70)) + 15;
+ // Menaruh garis panduan tipis transparan di area target serang
+                const laserGuide = document.createElement('div');
+                laserGuide.classList.add('laser-line');
+                laserGuide.style.left = (targetX + 10) + 'px';
+                container.appendChild(laserGuide);
+
+                setTimeout(() => {
+                    warningOverlay.classList.remove('active');
+                    if (!gameActive) { laserGuide.remove(); return; }
+
+                    // Aktifkan tembakan laser utama secara visual
+                    laserGuide.classList.add('fire');
+                    try { sfxAttack.currentTime = 0; sfxAttack.play().catch(() => {}); } catch(e) {}
+
+                    // Deteksi hit-box instan: Apakah player berdiri sejajar di jalur tembakan laser?
+                    if (playerX + 25 >= targetX - 5 && playerX <= targetX + 35) {
+                        playerKenaHit();
+                    } else {
+                        kurangiDarahBos();
+                    }
+
+                    // Singkirkan objek laser dari DOM setelah sekejap menembak
+                    setTimeout(() => { laserGuide.remove(); }, 350);
+
+                }, 900); // Durasi 0.9 detik buat kabur menjauhi garis indikator merah
+
+                urutanSerangan = 2; // Tukar ke skill shockwave berikutnya
+
+            } else if (urutanSerangan === 2) {
+                // SKILL 3: Serangan OMBAK KEJUT / SHOCKWAVE (Bonus Tambahan Bebas)
+                warningLabel.innerText = "LARI KE UJUNG ARENA!";
+                warningOverlay.classList.add('active');
+
+                try { sfxWarning.currentTime = 0; sfxWarning.play().catch(() => {}); } catch(e) {}
+
+                setTimeout(() => {
+                    warningOverlay.classList.remove('active');
+                    if (!gameActive) return;
+
+                    try { sfxAttack.currentTime = 0; sfxAttack.play().catch(() => {}); } catch(e) {}
+                    
+                    // Turunkan bola pemicu ledakan tepat di tengah-tengah arena
+                    buatBolaShockwave(container.offsetWidth / 2 - 22);
+                }, 750);
+
+                urutanSerangan = 0; // Reset balik lagi ke skill bola awal
+            }
+        }
+
+        // FUNGSI JATUH BOLA BAWAAN ASLI
+        function buatProyektil(posX) {
+            const projectile = document.createElement('div');
+            projectile.classList.add('boss-attack');
+            projectile.style.left = posX + 'px';
+            container.appendChild(projectile);
+
+            let posY = 220; 
+            const floorY = container.offsetHeight - 170; 
+
+            let pergerakanPeluru = setInterval(() => {
+                if (!gameActive) {
+                    clearInterval(pergerakanPeluru);
+                    projectile.remove();
+                    return;
+                }
+                posY += 14; 
+                projectile.style.top = posY + 'px';
+
+                // Hitbox Deteksi Tabrakan
+                if (posY >= floorY && posY <= floorY + 45) {
+                    if (posX >= playerX - 10 && posX <= playerX + 45) {
+                        clearInterval(pergerakanPeluru);
+                        projectile.remove();
+                        playerKenaHit();
+                    }
+                }
+
+                if (posY > container.offsetHeight) {
+                    clearInterval(pergerakanPeluru);
+                    projectile.remove();
+                    kurangiDarahBos();
+                }
+            }, 10);
+        }
+
+        // MEKANIK SKILL BARU: LOGIKA PROYEKTIL OMBAK KEJUT
+        function buatBolaShockwave(posX) {
+            const shockBall = document.createElement('div');
+            shockBall.classList.add('boss-shockball');
+            shockBall.style.left = posX + 'px';
+            container.appendChild(shockBall);
+
+            let posY = 220;
+            const floorY = container.offsetHeight - 165;
+
+            let jatuhBola = setInterval(() => {
+                if (!gameActive) { clearInterval(jatuhBola); shockBall.remove(); return; }
+
+                posY += 12;
+                shockBall.style.top = posY + 'px';
+
+                // Ketika menyentuh lantai arena, pecah jadi ombak kiri dan kanan!
+                if (posY >= floorY) {
+                    clearInterval(jatuhBola);
+                    shockBall.remove();
+
+                    // Efek getar layar dinamis saat benturan tanah
+                    container.classList.add('shake-effect');
+                    setTimeout(() => { container.classList.remove('shake-effect'); }, 150);
+
+                    // Pemicu perambatan gelombang ke kiri dan kanan
+                    pemicuOmbakMerambat(posX, 'left');
+                    pemicuOmbakMerambat(posX, 'right');
+                }
+            }, 10);
+        }
+
+        function pemicuOmbakMerambat(startX, arah) {
+            const wave = document.createElement('div');
+            wave.classList.add('shockwave');
+            wave.style.left = startX + 'px';
+            wave.style.bottom = '120px'; // Sejajar vertikal dengan posisi lari player
+            container.appendChild(wave);
+
+            let curX = startX;
+            let hitRegistered = false; 
+
+            let jalanOmbak = setInterval(() => {
+                if (!gameActive) { clearInterval(jalanOmbak); wave.remove(); return; }
+
+                if (arah === 'left') {
+                    curX -= 8;
+                } else {
+                    curX += 8;
+                }
+                wave.style.left = curX + 'px';
+
+                // Deteksi tabrakan ombak dengan tubuh player
+                if (!hitRegistered && curX >= playerX - 15 && curX <= playerX + 45) {
+                    hitRegistered = true;
+                    playerKenaHit();
+                }
+
+                // Bersihkan objek jika ombak menyentuh batas dinding luar game container
+                if (curX < 0 || curX > container.offsetWidth) {
+                    clearInterval(jalanOmbak);
+                    wave.remove();
+                    if (arah === 'left') kurangiDarahBos(); // Mengurangi nyawa bos jika sukses meloloskan diri
+                }
+            }, 12);
+        }
+
+        function playerKenaHit() {
+            try {
+                sfxHit.currentTime = 0;
+                sfxHit.play().catch(() => {});
+            } catch(e) {}
+            
+            playerHp -= 20;
+            document.getElementById('player-hp-bar').style.width = playerHp + '%';
+
+            if (playerHp <= 0) {
+                gameActive = false;
+                clearInterval(loopSerangan);
+                bgm.pause();
+                document.getElementById('gameover-screen').style.display = 'flex';
+            }
+        }
+
+        function kurangiDarahBos() {
+            bossHp -= 5;
+            document.getElementById('boss-hp-bar').style.width = bossHp + '%';
+
+            if (bossHp <= 0) {
+                gameActive = false;
+                clearInterval(loopSerangan);
+                alert("YOU WIN");
+           }
+        }
+    </script>
+</body>
+</html>
